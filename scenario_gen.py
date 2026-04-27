@@ -111,6 +111,12 @@ def generate(theme: str | None = None, difficulty: str | None = None, max_retrie
             last_errors = f"JSONパースエラー: {e}"
             continue
 
+        # ロック報酬アイテムは初期非表示にする
+        for lock in scenario.get("locks", {}).values():
+            reward = lock.get("reward")
+            if reward and reward in scenario.get("items", {}):
+                scenario["items"][reward]["reward_only"] = True
+
         result = validate(scenario)
         if result.ok:
             return scenario
