@@ -195,7 +195,9 @@ def _check_solvability(s: dict, r: ValidationResult) -> None:
 
         return results
 
-    MIN_STEPS = 4  # 最低限必要なアクション数（これ未満は簡単すぎ）
+    # BFSはenter_codeのコードを既知とし、examineステップをカウントしない。
+    # 数字錠1個+door_lockの標準構成は enter_code→pick_up→use_item で3ステップ。
+    MIN_STEPS = 3
 
     found = False
     min_depth = 0
