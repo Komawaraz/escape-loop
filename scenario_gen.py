@@ -127,6 +127,22 @@ def _assign_map_positions(scenario: dict) -> None:
         items[iid]["map_pos"] = list(pos)
 
 
+def _auto_repair_missing_items(scenario: dict) -> None:
+    """LLMが items に定義し忘れた reward / key_required アイテムを最小構成で補完する。"""
+    items: dict = scenario.setdefault("items", {})
+    locks: dict = scenario.get("locks", {})
+
+    for lid, lock in locks.items():
+        for field in ("reward", "key_required"):
+            iid = lock.get(field)
+            if iid and iid not in items:
+                items[iid] = {
+                    "name": iid.replace("_", " "),
+                    "examine": "何かが見つかった。",
+                    "takeable": True,
+                }
+
+
 def generate(theme: str | None = None, difficulty: str | None = None, max_retries: int = 3) -> dict:
     from scenario_validator import validate
 
@@ -155,6 +171,9 @@ def generate(theme: str | None = None, difficulty: str | None = None, max_retrie
         except json.JSONDecodeError as e:
             last_errors = f"JSONパースエラー: {e}"
             continue
+
+        # LLMが items に追加し忘れた lock reward / key_required を補完する
+        _auto_repair_missing_items(scenario)
 
         # ロック報酬アイテムは初期非表示にする
         for lock in scenario.get("locks", {}).values():
