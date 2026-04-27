@@ -190,6 +190,11 @@ def _auto_repair_missing_items(scenario: dict) -> None:
                     "takeable": True,
                 }
 
+    # アイテムの lock_id が locks に存在しない場合は lock_id を除去する
+    for item in items.values():
+        if "lock_id" in item and item["lock_id"] not in locks:
+            del item["lock_id"]
+
 
 def generate(theme: str | None = None, difficulty: str | None = None, max_retries: int = 3) -> dict:
     from scenario_validator import validate
