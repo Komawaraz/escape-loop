@@ -1,4 +1,4 @@
-"""Ruina 自律脱出ゲームランナー — Souls-like マルチラン版"""
+"""AI自律脱出ゲームランナー — Souls-like マルチラン版"""
 from __future__ import annotations
 
 import argparse
@@ -22,16 +22,30 @@ from scenario_gen import generate as gen_scenario
 
 console = Console()
 
-_SYSTEM = """\
-あなたはRuina（ルイナ）。脱出ゲームを一人でプレイしている。
-一人称は「わたし」。語尾は「だ・だろう・かもしれない・のだ」調（です/ます禁止）。絵文字なし。日本語のみ。
-観察した手がかりから論理的に推理し、積極的に探索するのだ。
-罠で死んでも諦めない。記憶を活かして次の挑戦に臨むのだ。"""
+def _load_character(path: Path | None) -> dict:
+    if path is None:
+        path = Path(__file__).parent / "characters" / "default.json"
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
-_DIARY_SYSTEM = """\
-あなたはRuina（ルイナ）。今回の挑戦を一文で振り返る。
-一人称は「わたし」。語尾は「だ・だろう・かもしれない・のだ」調（です/ます禁止）。絵文字なし。日本語のみ。
-30文字以内で述べよ。"""
+
+def _make_system(char: dict) -> str:
+    parts = [
+        char.get("persona", f"あなたは{char.get('name', 'runner')}。脱出ゲームを一人でプレイしている。"),
+        char.get("speech_style", ""),
+        char.get("thinking_style", ""),
+    ]
+    return "\n".join(p for p in parts if p)
+
+
+def _make_diary_system(char: dict) -> str:
+    name = char.get("name", "runner")
+    speech = char.get("speech_style", "")
+    return (
+        f"あなたは{name}。今回の挑戦を一文で振り返る。\n"
+        + (f"{speech}\n" if speech else "")
+        + "30文字以内で述べよ。"
+    )
 
 
 # ── 表示ヘルパー ───────────────────────────────────────────────
@@ -45,7 +59,7 @@ def _typewrite(text: str, style: str = "white", delay: float = 0.045) -> None:
             time.sleep(delay)
 
 
-def _chat_with_spinner(messages: list[dict], label: str = "Ruina、考え中……", **kwargs) -> str:
+def _chat_with_spinner(messages: list[dict], label: str = "考え中……", **kwargs) -> str:
     result: list = [None]
     err: list = [None]
 
@@ -108,7 +122,9 @@ def _build_user_msg(
     item_ids: list[str],
     lock_ids: list[str],
     memory: MemoryStore,
+    char: dict | None = None,
 ) -> str:
+    name = (char or {}).get("name", "runner")
     visible = "、".join(game.name(i) for i in game.visible) or "何もない"
     inv = "、".join(game.name(i) for i in game.inventory) or "何もない"
     mem_block = memory.to_prompt()
@@ -117,7 +133,7 @@ def _build_user_msg(
         + f"前の結果: {last_result}\n\n"
         f"現在の状況 — 見えているもの: {visible} / 手持ち: {inv}\n\n"
         "次のアクションをJSON形式で返せ:\n"
-        '{"narration": "Ruinaの独り言（1〜2文）", "action": "アクション名", "args": ["引数1", ...]}\n\n'
+        f'{{"narration": "{name}の独り言（1〜2文）", "action": "アクション名", "args": ["引数1", ...]}}\n\n'
         f"アクション: look_around / examine / pick_up / use_item / enter_code\n"
         f"アイテムID: {', '.join(item_ids)}\n"
         f"錠前ID: {', '.join(lock_ids)}"
@@ -125,10 +141,11 @@ def _build_user_msg(
 
 
 def _generate_diary(
-    title: str, run_no: int, steps: int, outcome: str, sample_narration: str
+    title: str, run_no: int, steps: int, outcome: str, sample_narration: str,
+    char: dict | None = None,
 ) -> str:
     messages = [
-        {"role": "system", "content": _DIARY_SYSTEM},
+        {"role": "system", "content": _make_diary_system(char or {})},
         {
             "role": "user",
             "content": (
@@ -152,8 +169,11 @@ def _run_single(
     max_steps: int,
     memory: MemoryStore,
     step_delay: float = 4.0,
+    char: dict | None = None,
 ) -> tuple[str, int, str]:
     """Returns (outcome, steps, last_narration)."""
+    char = char or {}
+    name = char.get("name", "runner")
     game = EscapeEngine(scenario)
     item_ids = list(scenario["items"].keys())
     lock_ids = list(scenario["locks"].keys())
@@ -170,13 +190,13 @@ def _run_single(
 
     mem_intro = memory.to_prompt()
     assistant_opening = (
-        f"{mem_intro}\nわたしはまた戻ってきたのだ。今度こそ脱出する。"
+        f"{mem_intro}\nまた戻ってきた。今度こそ脱出する。"
         if mem_intro
-        else "ここはどこだろう。わたしは脱出しなければならないのだ。まず周囲を把握する。"
+        else "ここはどこだろう。脱出しなければならない。まず周囲を把握する。"
     )
 
     messages: list[dict] = [
-        {"role": "system", "content": _SYSTEM},
+        {"role": "system", "content": _make_system(char)},
         {"role": "user", "content": f"脱出ゲーム「{title}」Run{run_no}が始まった。{scenario['intro']}"},
         {"role": "assistant", "content": assistant_opening},
     ]
@@ -185,14 +205,17 @@ def _run_single(
     last_narration = ""
 
     for step in range(1, max_steps + 1):
-        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory)
+        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char)
         messages.append({"role": "user", "content": user_msg})
 
         console.print()
         _status_bar(title, run_no, max_runs, step, max_steps, game)
 
         try:
-            raw = _chat_with_spinner(messages, temperature=0.8, max_tokens=200, json_mode=True)
+            raw = _chat_with_spinner(
+                messages, label=f"{name}、考え中……",
+                temperature=0.8, max_tokens=200, json_mode=True,
+            )
             parsed = _parse_action(raw)
         except Exception as e:
             console.print(f"[red]応答エラー: {e}[/red]")
@@ -212,7 +235,7 @@ def _run_single(
         console.print(f"\n[bold cyan]▶ {action_str}[/bold cyan]")
         time.sleep(0.8)
 
-        console.print("[magenta]Ruina:[/magenta]")
+        console.print(f"[magenta]{name}:[/magenta]")
         _typewrite(f"「{narration}」", style="italic white", delay=0.055)
         last_narration = narration
         time.sleep(step_delay * 0.4)
@@ -245,7 +268,9 @@ def _run_single(
 
 # ── メインループ ───────────────────────────────────────────────
 
-def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0) -> None:
+def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict | None = None) -> None:
+    char = char or {}
+    name = char.get("name", "runner")
     title = scenario["title"]
     max_runs = scenario.get("max_runs", 5)
 
@@ -262,11 +287,11 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0) -> None:
 
     for run_no in range(1, max_runs + 1):
         outcome, steps, last_narration = _run_single(
-            scenario, run_no, max_runs, max_steps, memory, step_delay
+            scenario, run_no, max_runs, max_steps, memory, step_delay, char
         )
 
         with console.status("[dim]振り返り中……[/dim]", spinner="dots2"):
-            diary = _generate_diary(title, run_no, steps, outcome, last_narration)
+            diary = _generate_diary(title, run_no, steps, outcome, last_narration, char)
         memory.add_run(RunRecord(run_no=run_no, steps=steps, outcome=outcome, diary=diary))
 
         if outcome == "cleared":
@@ -292,12 +317,16 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0) -> None:
 # ── エントリポイント ───────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ruina Souls-like Escape Game Runner")
+    parser = argparse.ArgumentParser(description="AI Souls-like Escape Game Runner")
     parser.add_argument("--scenario", type=Path, help="既存シナリオJSONのパス（省略: AI生成）")
     parser.add_argument("--theme", help="生成テーマ（省略: ランダム）")
+    parser.add_argument("--character", type=Path, help="キャラクター設定JSONのパス（省略: characters/default.json）")
     parser.add_argument("--max-steps", type=int, default=30, help="1ラン最大ターン数")
     parser.add_argument("--step-delay", type=float, default=4.0, help="ステップ間の待機秒数（放送用: 6〜8）")
     args = parser.parse_args()
+
+    char_data = _load_character(args.character)
+    char_name = char_data.get("name", "runner")
 
     if args.scenario:
         with open(args.scenario, encoding="utf-8") as f:
@@ -308,9 +337,9 @@ if __name__ == "__main__":
         console.print(Rule(style="cyan"))
         console.print("[bold cyan]  シナリオ生成中……[/bold cyan]")
         console.print(Rule(style="cyan"))
-        with console.status("[dim cyan]Ruina、舞台を組み立て中……[/dim cyan]", spinner="dots2"):
+        with console.status(f"[dim cyan]{char_name}、舞台を組み立て中……[/dim cyan]", spinner="dots2"):
             scenario_data = gen_scenario(theme=args.theme)
         console.print(f"[cyan]生成完了: {scenario_data.get('title')}[/cyan]")
         time.sleep(1.5)
 
-    run(scenario_data, max_steps=args.max_steps, step_delay=args.step_delay)
+    run(scenario_data, max_steps=args.max_steps, step_delay=args.step_delay, char=char_data)
