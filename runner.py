@@ -42,6 +42,11 @@ class GameLogger:
         self._write(f"開始: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         self._write("")
 
+    def room_start(self, room_no: int, total_rooms: int, title: str) -> None:
+        self._write(f"{'═' * 40}")
+        self._write(f"部屋 {room_no}/{total_rooms}: {title}")
+        self._write(f"{'═' * 40}")
+
     def run_start(self, run_no: int, max_runs: int) -> None:
         self._write(f"{'─' * 40}")
         self._write(f"Run {run_no}/{max_runs} 開始")
@@ -408,27 +413,36 @@ def _run_single(
     return "timeout", max_steps, last_narration
 
 
-# ── メインループ ───────────────────────────────────────────────
+# ── 部屋ループ（単室・多室共用） ───────────────────────────────
 
-def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict | None = None) -> None:
-    _launch_map_viewer()
-
-    char = char or {}
+def _run_room(
+    scenario: dict,
+    max_steps: int,
+    step_delay: float,
+    char: dict,
+    memory: MemoryStore,
+    logger: GameLogger,
+    max_runs: int,
+    room_no: int = 1,
+    total_rooms: int = 1,
+) -> tuple[str, int]:
+    """Returns (outcome, runs_used). outcome: 'cleared' | 'over'."""
     name = char.get("name", "runner")
     title = scenario["title"]
-    max_runs = scenario.get("max_runs", 5)
 
     console.print()
     console.print(Rule(style="magenta"))
-    console.print(f"[bold magenta]  {title}[/bold magenta]")
+    if total_rooms > 1:
+        console.print(
+            f"[bold magenta]  部屋 {room_no}/{total_rooms}: {title}[/bold magenta]"
+        )
+    else:
+        console.print(f"[bold magenta]  {title}[/bold magenta]")
     console.print(Rule(style="magenta"))
     console.print()
     _typewrite(scenario["intro"], style="dim white", delay=0.035)
     console.print()
     time.sleep(2.0)
-
-    memory = MemoryStore()
-    logger = GameLogger(title, name)
 
     for run_no in range(1, max_runs + 1):
         logger.run_start(run_no, max_runs)
@@ -445,22 +459,118 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict
             console.print()
             console.print(Rule(style="bright_yellow"))
             console.print(
-                f"[bold bright_yellow]  GAME CLEARED  Total Runs: {run_no}[/bold bright_yellow]"
+                f"[bold bright_yellow]  脱出成功！  Run {run_no}/{max_runs}  "
+                f"クリアターン: {steps}[/bold bright_yellow]"
             )
             console.print(Rule(style="bright_yellow"))
-            logger.game_end("cleared")
-            return
+            return "cleared", run_no
 
         if run_no < max_runs:
             console.print()
             console.print(f"[dim]次の挑戦へ……[/dim]")
             time.sleep(2.0)
 
+    return "over", max_runs
+
+
+# ── 単室エントリポイント ───────────────────────────────────────
+
+def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict | None = None) -> None:
+    _launch_map_viewer()
+    char = char or {}
+    name = char.get("name", "runner")
+    title = scenario["title"]
+    max_runs = scenario.get("max_runs", 5)
+
+    memory = MemoryStore()
+    logger = GameLogger(title, name)
+
+    outcome, runs_used = _run_room(
+        scenario, max_steps, step_delay, char, memory, logger, max_runs
+    )
+
+    if outcome == "cleared":
+        console.print()
+        console.print(Rule(style="bright_yellow"))
+        console.print(
+            f"[bold bright_yellow]  GAME CLEARED  Total Runs: {runs_used}[/bold bright_yellow]"
+        )
+        console.print(Rule(style="bright_yellow"))
+        logger.game_end("cleared")
+    else:
+        console.print()
+        console.print(Rule(style="red"))
+        console.print(f"[red]  {max_runs}回の挑戦、すべて失敗……  GAME OVER[/red]")
+        console.print(Rule(style="red"))
+        logger.game_end("over")
+
+
+# ── マルチルームキャンペーン ───────────────────────────────────
+
+def run_campaign(
+    scenarios: list[dict],
+    max_steps: int = 30,
+    step_delay: float = 4.0,
+    char: dict | None = None,
+    hardcore: bool = False,
+) -> None:
+    _launch_map_viewer()
+    char = char or {}
+    name = char.get("name", "runner")
+    total_rooms = len(scenarios)
+    mode_label = "HARDCORE" if hardcore else "CAMPAIGN"
+    campaign_title = f"{mode_label} — 全{total_rooms}部屋"
+    logger = GameLogger(campaign_title, name)
+
     console.print()
-    console.print(Rule(style="red"))
-    console.print(f"[red]  {max_runs}回の挑戦、すべて失敗……  GAME OVER[/red]")
-    console.print(Rule(style="red"))
-    logger.game_end("over")
+    console.print(Rule(style="bright_cyan"))
+    console.print(
+        f"[bold bright_cyan]  {mode_label}: 全{total_rooms}部屋クリアを目指せ[/bold bright_cyan]"
+    )
+    console.print(Rule(style="bright_cyan"))
+    time.sleep(2.0)
+
+    # hardcore: 記憶を部屋間で引き継ぐ; normal: 部屋ごとにリセット
+    shared_memory: MemoryStore | None = MemoryStore() if hardcore else None
+
+    for room_no, scenario in enumerate(scenarios, 1):
+        title = scenario["title"]
+        max_runs = scenario.get("max_runs", 5)
+
+        if room_no > 1:
+            console.print()
+            console.print(Rule(style="bright_cyan"))
+            console.print(
+                f"[bold bright_cyan]  次の部屋へ……  {room_no}/{total_rooms}[/bold bright_cyan]"
+            )
+            console.print(Rule(style="bright_cyan"))
+            time.sleep(3.0)
+
+        memory = shared_memory if hardcore else MemoryStore()
+        logger.room_start(room_no, total_rooms, title)
+
+        outcome, runs_used = _run_room(
+            scenario, max_steps, step_delay, char, memory, logger, max_runs,
+            room_no=room_no, total_rooms=total_rooms,
+        )
+
+        if outcome != "cleared":
+            console.print()
+            console.print(Rule(style="red"))
+            console.print(
+                f"[red]  部屋 {room_no}/{total_rooms} で力尽きた……  {mode_label} OVER[/red]"
+            )
+            console.print(Rule(style="red"))
+            logger.game_end("over")
+            return
+
+    console.print()
+    console.print(Rule(style="bright_yellow"))
+    console.print(
+        f"[bold bright_yellow]  全{total_rooms}部屋クリア！  {mode_label} CLEARED[/bold bright_yellow]"
+    )
+    console.print(Rule(style="bright_yellow"))
+    logger.game_end("cleared")
 
 
 # ── エントリポイント ───────────────────────────────────────────
@@ -472,42 +582,91 @@ if __name__ == "__main__":
     parser.add_argument("--character", type=Path, help="キャラクター設定JSONのパス（省略: characters/default.json）")
     parser.add_argument("--max-steps", type=int, default=30, help="1ラン最大ターン数")
     parser.add_argument("--step-delay", type=float, default=4.0, help="ステップ間の待機秒数（放送用: 6〜8）")
+    parser.add_argument("--rooms", type=int, default=1, help="部屋数（2以上でマルチルームモード、AI生成のみ）")
+    parser.add_argument("--hardcore", action="store_true", help="ハードコアモード: 記憶が部屋をまたいで引き継がれる")
     args = parser.parse_args()
 
     char_data = _load_character(args.character)
     char_name = char_data.get("name", "runner")
 
-    ai_generated = False
-    if args.scenario:
-        with open(args.scenario, encoding="utf-8") as f:
-            scenario_data = json.load(f)
-        console.print(f"[cyan]シナリオ読み込み: {scenario_data.get('title')}[/cyan]")
-    else:
+    # ── マルチルームモード ────────────────────────────────────────
+    if args.rooms > 1:
+        if args.scenario:
+            console.print("[yellow]警告: --rooms > 1 では --scenario は無視されます（AI生成のみ）[/yellow]")
+
         console.print()
         console.print(Rule(style="cyan"))
-        console.print("[bold cyan]  シナリオ生成中……[/bold cyan]")
+        console.print(f"[bold cyan]  全{args.rooms}部屋のシナリオを生成中……[/bold cyan]")
         console.print(Rule(style="cyan"))
-        with console.status(f"[dim cyan]{char_name}、舞台を組み立て中……[/dim cyan]", spinner="dots2"):
-            scenario_data = gen_scenario(theme=args.theme)
-        console.print(f"[cyan]生成完了: {scenario_data.get('title')}[/cyan]")
-        ai_generated = True
+
+        generated_scenarios: list[dict] = []
+        for i in range(args.rooms):
+            with console.status(
+                f"[dim cyan]{char_name}、部屋 {i + 1}/{args.rooms} を組み立て中……[/dim cyan]",
+                spinner="dots2",
+            ):
+                s = gen_scenario(theme=args.theme)
+            generated_scenarios.append(s)
+            console.print(f"[cyan]  部屋 {i + 1}: {s.get('title')}[/cyan]")
+
         time.sleep(1.5)
+        run_campaign(
+            generated_scenarios,
+            max_steps=args.max_steps,
+            step_delay=args.step_delay,
+            char=char_data,
+            hardcore=args.hardcore,
+        )
 
-    run(scenario_data, max_steps=args.max_steps, step_delay=args.step_delay, char=char_data)
-
-    if ai_generated:
         console.print()
         try:
-            answer = input("このシナリオを保存しますか？ [y/N]: ").strip().lower()
+            answer = input("生成したシナリオを保存しますか？ [y/N]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             answer = ""
         if answer == "y":
             scenarios_dir = Path(__file__).resolve().parent / "scenarios"
             scenarios_dir.mkdir(exist_ok=True)
-            safe_title = re.sub(r'[\\/:*?"<>|]', "_", scenario_data.get("title", "scenario"))
-            save_path = scenarios_dir / f"{safe_title}.json"
-            save_path.write_text(
-                json.dumps(scenario_data, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            console.print(f"[cyan]保存しました: {save_path}[/cyan]")
+            for s in generated_scenarios:
+                safe_title = re.sub(r'[\\/:*?"<>|]', "_", s.get("title", "scenario"))
+                save_path = scenarios_dir / f"{safe_title}.json"
+                save_path.write_text(
+                    json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                console.print(f"[cyan]保存: {save_path}[/cyan]")
+
+    # ── 単室モード ────────────────────────────────────────────────
+    else:
+        ai_generated = False
+        if args.scenario:
+            with open(args.scenario, encoding="utf-8") as f:
+                scenario_data = json.load(f)
+            console.print(f"[cyan]シナリオ読み込み: {scenario_data.get('title')}[/cyan]")
+        else:
+            console.print()
+            console.print(Rule(style="cyan"))
+            console.print("[bold cyan]  シナリオ生成中……[/bold cyan]")
+            console.print(Rule(style="cyan"))
+            with console.status(f"[dim cyan]{char_name}、舞台を組み立て中……[/dim cyan]", spinner="dots2"):
+                scenario_data = gen_scenario(theme=args.theme)
+            console.print(f"[cyan]生成完了: {scenario_data.get('title')}[/cyan]")
+            ai_generated = True
+            time.sleep(1.5)
+
+        run(scenario_data, max_steps=args.max_steps, step_delay=args.step_delay, char=char_data)
+
+        if ai_generated:
+            console.print()
+            try:
+                answer = input("このシナリオを保存しますか？ [y/N]: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+            if answer == "y":
+                scenarios_dir = Path(__file__).resolve().parent / "scenarios"
+                scenarios_dir.mkdir(exist_ok=True)
+                safe_title = re.sub(r'[\\/:*?"<>|]', "_", scenario_data.get("title", "scenario"))
+                save_path = scenarios_dir / f"{safe_title}.json"
+                save_path.write_text(
+                    json.dumps(scenario_data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                console.print(f"[cyan]保存しました: {save_path}[/cyan]")
