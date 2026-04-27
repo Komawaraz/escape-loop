@@ -126,12 +126,18 @@ python map_viewer.py
 
 `.env` に以下を設定してください。
 
-| バックエンド | OPENAI_BASE_URL | MODEL_NAME |
+| バックエンド | OPENAI_BASE_URL | MODEL_NAME 例 |
 |---|---|---|
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `anthropic/claude-3.5-sonnet` |
+| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-2.0-flash` |
+| Together AI | `https://api.together.xyz/v1` | `meta-llama/Llama-3-70b-chat-hf` |
 | vLLM | `http://localhost:8000/v1` | 使用するモデルID |
 | Ollama | `http://localhost:11434/v1` | `llama3.1` など |
 | LM Studio | `http://localhost:1234/v1` | 使用するモデルID |
+
+> **Claude API を使いたい場合**: Anthropic の API は OpenAI 互換ではないため直接は使えません。**OpenRouter** 経由であれば `anthropic/claude-3.5-sonnet` などを指定して利用できます。
 
 ## 仕組み
 
