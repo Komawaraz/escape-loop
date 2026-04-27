@@ -150,10 +150,20 @@ def build_display(state: dict) -> Text:
 
     memo: list = state.get("memo", [])
     if memo:
+        # R{n}S{m} プレフィックスを除いたアクション部分で重複カウント
+        counts: dict[str, int] = {}
+        order: list[str] = []
+        for entry in memo:
+            key = entry.split(" ", 1)[1] if " " in entry else entry
+            if key not in counts:
+                order.append(key)
+            counts[key] = counts.get(key, 0) + 1
         out.append("─" * 40 + "\n", style="dim")
-        out.append(f" やったこと ({len(memo)}件)\n", style="bold dim")
-        for entry in memo[-30:]:
-            out.append(f"  {entry}\n", style="dim")
+        out.append(f" やったこと ({len(order)}種 / 計{len(memo)}件)\n", style="bold dim")
+        for key in order:
+            c = counts[key]
+            suffix = f" ×{c}" if c > 1 else ""
+            out.append(f"  {key}{suffix}\n", style="dim yellow" if c > 1 else "dim")
 
     if won:
         out.append("\n ★ 脱出成功！\n", style="bold yellow")

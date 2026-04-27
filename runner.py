@@ -266,13 +266,22 @@ def _build_user_msg(
     lock_ids: list[str],
     memory: MemoryStore,
     char: dict | None = None,
+    room_memo: list[str] | None = None,
 ) -> str:
     name = (char or {}).get("name", "runner")
     visible = "、".join(f"{game.name(i)}[{i}]" for i in game.visible) or "何もない"
     inv = "、".join(f"{game.name(i)}[{i}]" for i in game.inventory) or "何もない"
     mem_block = memory.to_prompt()
+
+    tried_block = ""
+    if room_memo:
+        unique = list(dict.fromkeys(e.split(" ", 1)[1] for e in room_memo if " " in e))
+        if unique:
+            tried_block = "すでに試したこと（同じ行動を繰り返すな）: " + "、".join(unique) + "\n\n"
+
     return (
         (f"{mem_block}\n\n" if mem_block else "")
+        + tried_block
         + f"前の結果: {last_result}\n\n"
         f"現在の状況 — 見えているもの: {visible} / 手持ち: {inv}\n\n"
         "次のアクションをJSON形式で返せ:\n"
@@ -374,7 +383,7 @@ def _run_single(
     current_pos = ""
 
     for step in range(1, max_steps + 1):
-        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char)
+        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char, room_memo)
         messages.append({"role": "user", "content": user_msg})
 
         console.print()
