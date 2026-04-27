@@ -151,8 +151,8 @@ def build_display(state: dict) -> Text:
     memo: list = state.get("memo", [])
     if memo:
         out.append("─" * 40 + "\n", style="dim")
-        out.append(" 部屋メモ\n", style="bold dim")
-        for entry in memo[-20:]:
+        out.append(f" やったこと ({len(memo)}件)\n", style="bold dim")
+        for entry in memo[-30:]:
             out.append(f"  {entry}\n", style="dim")
 
     if won:

@@ -391,8 +391,7 @@ def _run_single(
         last_result = result.message
         current_pos = args[0] if args else current_pos
         if room_memo is not None:
-            short = result.message[:24] + "…" if len(result.message) > 24 else result.message
-            room_memo.append(f"[R{run_no}-S{step}] {action_str}: {short}")
+            room_memo.append(f"R{run_no}S{step} {action_str}")
         _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos, memo=room_memo)
         if logger:
             logger.step(step, action_str, narration, result.message)
