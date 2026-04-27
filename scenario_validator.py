@@ -78,6 +78,15 @@ def _check_structure(s: dict, r: ValidationResult) -> None:
         if lid and lid not in all_lock_ids:
             r.errors.append(f"items[{iid}].lock_id: '{lid}' は locks に存在しない")
 
+    # 逆引き: locks に定義されているのにどのアイテムも参照していないロックはBFSで解除不能
+    referenced_by_item = {item.get("lock_id") for item in items.values() if item.get("lock_id")}
+    for lid in locks:
+        if lid not in referenced_by_item:
+            r.errors.append(
+                f"locks[{lid}] を lock_id に設定しているアイテムが存在しない。"
+                "必ずいずれかのアイテムに lock_id: '{lid}' を設定せよ"
+            )
+
     # locks.reward / key_required
     for lid, lock in locks.items():
         reward = lock.get("reward")
