@@ -20,7 +20,17 @@ load_dotenv()
 _API_KEY = os.environ.get("OPENAI_API_KEY", "dummy")
 _BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 _MODEL = os.environ.get("MODEL_NAME", "gpt-4o-mini")
-_ENABLE_THINKING = os.environ.get("ENABLE_THINKING", "false").lower() == "true"
+
+# ENABLE_THINKING が明示されている場合のみ extra_body で thinking 制御を送る
+# "false" → enable_thinking: false（Qwen3のthinkingタグを無効化）
+# "true"  → enable_thinking: true
+# 未設定  → 送らない（OpenAI等の標準API向け）
+_THINKING_ENV = os.environ.get("ENABLE_THINKING", "").lower()
+_THINKING_EXTRA: dict | None = (
+    {"chat_template_kwargs": {"enable_thinking": _THINKING_ENV == "true"}}
+    if _THINKING_ENV in ("true", "false")
+    else None
+)
 
 _client = OpenAI(api_key=_API_KEY, base_url=_BASE_URL)
 
@@ -39,8 +49,8 @@ def chat(
     )
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    if _ENABLE_THINKING:
-        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    if _THINKING_EXTRA is not None:
+        kwargs["extra_body"] = _THINKING_EXTRA
 
     resp = _client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content or ""

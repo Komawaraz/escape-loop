@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
+import os
 import re
+import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+
+_STATE_FILE = Path(os.environ.get("ESCAPE_STATE_FILE", "/tmp/escape_loop_state.json"))
 
 from rich.console import Console
 from rich.live import Live
@@ -21,6 +26,58 @@ from memory import MemoryStore, RunRecord
 from scenario_gen import generate as gen_scenario
 
 console = Console()
+
+
+def _stop_map_viewer() -> None:
+    subprocess.run(["pkill", "-f", "map_viewer.py"], capture_output=True)
+
+
+def _launch_map_viewer() -> None:
+    try:
+        already = subprocess.run(["pgrep", "-f", "map_viewer.py"], capture_output=True)
+        if already.returncode == 0:
+            return
+    except FileNotFoundError:
+        pass
+
+    viewer = Path(__file__).resolve().parent / "map_viewer.py"
+    if not viewer.exists():
+        return
+
+    python = sys.executable
+    cmd = f"{python} {viewer}"
+
+    # Case 1: tmux内 → 右ペインに分割
+    if os.environ.get("TMUX"):
+        if os.system(f"tmux split-window -h '{cmd}'") == 0:
+            atexit.register(_stop_map_viewer)
+            return
+
+    # Case 2: tmux外でもtmuxが入っている → 既存セッションの新規ウィンドウで開く
+    try:
+        sessions = subprocess.run(
+            ["tmux", "list-sessions", "-F", "#{session_name}"],
+            capture_output=True, text=True,
+        )
+        if sessions.returncode == 0 and sessions.stdout.strip():
+            session = sessions.stdout.strip().splitlines()[0]
+            if os.system(f"tmux new-window -t '{session}' '{cmd}'") == 0:
+                console.print(f"[dim]map_viewer: tmux セッション '{session}' の新規ウィンドウで起動[/dim]")
+                atexit.register(_stop_map_viewer)
+                return
+    except FileNotFoundError:
+        pass
+
+    # Case 3: tmuxなし → バックグラウンド起動
+    subprocess.Popen(
+        [python, str(viewer)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    console.print(f"[dim]map_viewer: バックグラウンドで起動しました[/dim]")
+    console.print(f"[dim]  → 別端末で確認: python {viewer}[/dim]")
+    atexit.register(_stop_map_viewer)
 
 def _load_character(path: Path | None) -> dict:
     if path is None:
@@ -116,6 +173,39 @@ def _you_died(reason: str) -> None:
     time.sleep(3.5)
 
 
+def _write_state(
+    scenario: dict,
+    game: "EscapeEngine",
+    run_no: int,
+    max_runs: int,
+    step: int,
+    max_steps: int,
+    last_action: str,
+    last_narration: str,
+    won: bool = False,
+    current_pos: str = "",
+) -> None:
+    state = {
+        "title": scenario.get("title", ""),
+        "run_no": run_no,
+        "max_runs": max_runs,
+        "step": step,
+        "max_steps": max_steps,
+        "visible": list(game.visible),
+        "inventory": list(game.inventory),
+        "unlocked": list(game.unlocked),
+        "last_action": last_action,
+        "last_narration": last_narration,
+        "won": won,
+        "current_pos": current_pos,
+        "scenario": scenario,
+    }
+    try:
+        _STATE_FILE.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def _build_user_msg(
     game: EscapeEngine,
     last_result: str,
@@ -203,6 +293,7 @@ def _run_single(
 
     last_result = f"Run{run_no} 開始"
     last_narration = ""
+    current_pos = ""
 
     for step in range(1, max_steps + 1):
         user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char)
@@ -243,6 +334,8 @@ def _run_single(
         result: ActionResult = game.execute(action, args)
         _typewrite(result.message, style="yellow", delay=0.03)
         last_result = result.message
+        current_pos = args[0] if args else current_pos
+        _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos)
         time.sleep(step_delay)
 
         if result.died:
@@ -254,6 +347,7 @@ def _run_single(
             return "died", step, last_narration
 
         if result.cleared:
+            _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, won=True, current_pos=current_pos)
             console.print()
             console.print(Rule(style="yellow"))
             console.print(
@@ -269,6 +363,8 @@ def _run_single(
 # ── メインループ ───────────────────────────────────────────────
 
 def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict | None = None) -> None:
+    _launch_map_viewer()
+
     char = char or {}
     name = char.get("name", "runner")
     title = scenario["title"]
