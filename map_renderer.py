@@ -41,7 +41,7 @@ def _cell(iid: str, game, current_pos: str = "") -> tuple[str, str]:
     if iid in game.inventory:
         return ("(持参済)", "dim")
     if iid not in game.visible:
-        return ("", "")
+        return (" [?]", "dim")
     if locked:
         return (f"{prefix}[{_fit(name, max_wl)}*]", "bold yellow" if is_here else "yellow")
     return (f"{prefix}[{_fit(name, max_w)}]", "bold bright_cyan" if is_here else "bright_white")
