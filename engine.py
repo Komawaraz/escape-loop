@@ -51,13 +51,18 @@ class EscapeEngine:
             ):
                 continue
             severity = trap.get("severity", "death")
-            msg = trap.get("death_message", "罠が発動した……")
             hint = trap.get("memory_hint", "")
             if severity == "death":
+                msg = trap.get("death_message") or "罠が発動した……"
                 return ActionResult(
                     message=msg, died=True, death_reason=msg, death_memory_hint=hint
                 )
-            return ActionResult(message=f"[WARNING] {msg}")
+            warning_msg = (
+                trap.get("warning_message")
+                or trap.get("death_message")
+                or "何か危険を感じた……行動を慎め"
+            )
+            return ActionResult(message=f"[WARNING] {warning_msg}")
         return None
 
     def execute(self, action: str, args: list[str]) -> ActionResult:

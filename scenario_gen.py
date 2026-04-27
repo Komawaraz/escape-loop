@@ -65,6 +65,13 @@ _GEN_PROMPT = """\
       "severity": "death",
       "death_message": "死亡描写（1〜2文）",
       "memory_hint": "次Run向けの警告（答えは含めない）"
+    }},
+    {{
+      "trap_id": "...",
+      "trigger": {{"action": "examine", "args": ["アイテムID"]}},
+      "severity": "warning",
+      "warning_message": "危険を示す警告文（死なないが注意が必要な内容）",
+      "memory_hint": "次Run向けの補足情報"
     }}
   ],
   "code_limits": {{
