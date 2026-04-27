@@ -195,6 +195,12 @@ def _auto_repair_missing_items(scenario: dict) -> None:
         if "lock_id" in item and item["lock_id"] not in locks:
             del item["lock_id"]
 
+    # code_limits.exhaust_trap が traps に存在しない場合は除去する
+    trap_ids = {t.get("trap_id") for t in scenario.get("traps", []) if t.get("trap_id")}
+    for limit in scenario.get("code_limits", {}).values():
+        if "exhaust_trap" in limit and limit["exhaust_trap"] not in trap_ids:
+            del limit["exhaust_trap"]
+
 
 def generate(theme: str | None = None, difficulty: str | None = None, max_retries: int = 3) -> dict:
     from scenario_validator import validate
