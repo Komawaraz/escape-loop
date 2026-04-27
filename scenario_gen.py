@@ -26,7 +26,7 @@ _GEN_PROMPT = """\
 
 【パズル設計の絶対ルール — 違反禁止】
 1. door_lock の key_required に指定する最終鍵は、必ず数字錠の reward として入手する構造にせよ
-   （最終鍵を直接 takeable で床に置くことは禁止）
+   （最終鍵を直接 takeable で床に置くことは禁止。items.contains への格納も禁止—containsはexamineで取り出せるため施錠の意味がない）
 2. 数字錠の answer（暗証番号）は、複数のアイテムを examine して初めて判明する構造にせよ
    （番号が単独のアイテムに直接書いてある場合は禁止）
 3. 最低でも「examine × 2〜3 → enter_code → pick_up → use_item」の手順が必要な難度にせよ

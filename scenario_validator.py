@@ -44,15 +44,23 @@ def _check_structure(s: dict, r: ValidationResult) -> None:
         r.errors.append("locks に 'door_lock' が存在しない")
 
     # 最終鍵がロック報酬経由でのみ入手可能か確認
+    # contains はexamineで取り出せるため施錠の意味がなく、reward 経由のみ許可する
     final_key = locks.get("door_lock", {}).get("key_required")
     if final_key and final_key in items:
         reward_items = {lock.get("reward") for lock in locks.values()}
         contained = {c for item in items.values() for c in item.get("contains", [])}
-        if final_key not in reward_items and final_key not in contained:
-            r.errors.append(
-                f"door_lock の key_required '{final_key}' が床に直接置かれている。"
-                "必ず数字錠の reward 経由で入手できる構造にせよ"
-            )
+        if final_key not in reward_items:
+            if final_key in contained:
+                r.errors.append(
+                    f"door_lock の key_required '{final_key}' が contains 経由で取得可能。"
+                    "contains アイテムは examine で解放されるため施錠の意味がない。"
+                    "必ず数字錠の reward にせよ"
+                )
+            else:
+                r.errors.append(
+                    f"door_lock の key_required '{final_key}' が床に直接置かれている。"
+                    "必ず数字錠の reward 経由で入手できる構造にせよ"
+                )
 
     all_item_ids = set(items.keys())
     all_lock_ids = set(locks.keys())
