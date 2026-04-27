@@ -37,7 +37,8 @@ class EscapeEngine:
     def name(self, iid: str) -> str:
         return self.scenario["items"].get(iid, {}).get("name", iid)
 
-    def _check_traps(self, action: str, args: list[str]) -> ActionResult | None:
+    def _check_traps(self, action: str, args: list[str]) -> tuple[ActionResult | None, str]:
+        """Returns (death_result or None, warning_message or "")."""
         for trap in self.scenario.get("traps", []):
             trigger = trap.get("trigger", {})
             if not trigger:
@@ -56,23 +57,29 @@ class EscapeEngine:
                 msg = trap.get("death_message") or "罠が発動した……"
                 return ActionResult(
                     message=msg, died=True, death_reason=msg, death_memory_hint=hint
-                )
+                ), ""
             warning_msg = (
                 trap.get("warning_message")
                 or trap.get("death_message")
                 or "何か危険を感じた……行動を慎め"
             )
-            return ActionResult(message=f"[WARNING] {warning_msg}")
-        return None
+            return None, warning_msg
+        return None, ""
 
     def execute(self, action: str, args: list[str]) -> ActionResult:
         if self.won:
             return ActionResult(message="すでに脱出成功！", cleared=True)
 
-        trap_result = self._check_traps(action, args)
-        if trap_result:
-            return trap_result
+        death_result, warning_msg = self._check_traps(action, args)
+        if death_result:
+            return death_result
 
+        result = self._execute_action(action, args)
+        if warning_msg and not result.died and not result.cleared:
+            result.message += f"\n[WARNING] {warning_msg}"
+        return result
+
+    def _execute_action(self, action: str, args: list[str]) -> ActionResult:
         if action == "look_around":
             visible = "、".join(self.name(i) for i in self.visible) or "何もない"
             inv = "、".join(self.name(i) for i in self.inventory) or "何もない"
