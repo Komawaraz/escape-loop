@@ -269,6 +269,16 @@ def _write_state(
         pass
 
 
+def _lock_label(lid: str, locks: dict | None) -> str:
+    if not locks:
+        return lid
+    lock = locks.get(lid, {})
+    if "answer" in lock:
+        digits = lock.get("digits", len(str(lock["answer"])))
+        return f"{lid}（{digits}桁の数字錠）"
+    return lid
+
+
 def _build_user_msg(
     game: EscapeEngine,
     last_result: str,
@@ -277,6 +287,7 @@ def _build_user_msg(
     memory: MemoryStore,
     char: dict | None = None,
     room_memo: list[str] | None = None,
+    locks: dict | None = None,
 ) -> str:
     name = (char or {}).get("name", "runner")
     visible = "、".join(f"{game.name(i)}[{i}]" for i in game.visible) or "何もない"
@@ -298,7 +309,7 @@ def _build_user_msg(
         f'{{"narration": "{name}の独り言（1〜2文）", "action": "アクション名", "args": ["引数1", ...]}}\n\n'
         f"アクション: look_around / examine / pick_up / use_item / enter_code\n"
         f"アイテムID（[]内がargs に使うID）: {', '.join(item_ids)}\n"
-        f"錠前ID: {', '.join(lock_ids)}"
+        f"錠前ID: {', '.join(_lock_label(lid, locks) for lid in lock_ids)}"
     )
 
 
@@ -393,7 +404,7 @@ def _run_single(
     current_pos = ""
 
     for step in range(1, max_steps + 1):
-        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char, room_memo)
+        user_msg = _build_user_msg(game, last_result, item_ids, lock_ids, memory, char, room_memo, locks=scenario.get("locks"))
         messages.append({"role": "user", "content": user_msg})
 
         console.print()
