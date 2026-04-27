@@ -266,8 +266,8 @@ def _build_user_msg(
     char: dict | None = None,
 ) -> str:
     name = (char or {}).get("name", "runner")
-    visible = "、".join(game.name(i) for i in game.visible) or "何もない"
-    inv = "、".join(game.name(i) for i in game.inventory) or "何もない"
+    visible = "、".join(f"{game.name(i)}[{i}]" for i in game.visible) or "何もない"
+    inv = "、".join(f"{game.name(i)}[{i}]" for i in game.inventory) or "何もない"
     mem_block = memory.to_prompt()
     return (
         (f"{mem_block}\n\n" if mem_block else "")
@@ -276,7 +276,7 @@ def _build_user_msg(
         "次のアクションをJSON形式で返せ:\n"
         f'{{"narration": "{name}の独り言（1〜2文）", "action": "アクション名", "args": ["引数1", ...]}}\n\n'
         f"アクション: look_around / examine / pick_up / use_item / enter_code\n"
-        f"アイテムID: {', '.join(item_ids)}\n"
+        f"アイテムID（[]内がargs に使うID）: {', '.join(item_ids)}\n"
         f"錠前ID: {', '.join(lock_ids)}"
     )
 
