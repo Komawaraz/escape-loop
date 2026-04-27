@@ -392,7 +392,7 @@ def _run_single(
         try:
             raw = _chat_with_spinner(
                 messages, label=f"{name}、考え中……",
-                temperature=0.8, max_tokens=200, json_mode=True,
+                temperature=0.8, max_tokens=350, json_mode=True,
             )
             parsed = _parse_action(raw)
         except Exception as e:
