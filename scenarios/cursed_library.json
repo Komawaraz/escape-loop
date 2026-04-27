@@ -50,7 +50,8 @@
     "crystal_key": {
       "name": "水晶の鍵",
       "examine": "透き通った水晶でできた鍵。持ち手に小さく「EXIT」と刻まれている。",
-      "takeable": true
+      "takeable": true,
+      "reward_only": true
     }
   },
   "locks": {

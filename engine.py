@@ -21,8 +21,13 @@ class EscapeEngine:
             for item in scenario["items"].values()
             for c in item.get("contains", [])
         }
+        reward_only = {
+            iid for iid, item in scenario["items"].items()
+            if item.get("reward_only")
+        }
         self.visible: list[str] = [
-            iid for iid in scenario["items"] if iid not in contained
+            iid for iid in scenario["items"]
+            if iid not in contained and iid not in reward_only
         ]
         self.inventory: list[str] = []
         self.unlocked: list[str] = []
