@@ -186,14 +186,24 @@ def _chat_with_spinner(messages: list[dict], label: str = "考え中……", **k
     return result[0]
 
 
+def _repair_json(text: str) -> str:
+    # 末尾カンマを除去 ("key": "val",} や "val",])
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+    return text
+
+
 def _parse_action(text: str) -> dict:
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            return json.loads(m.group())
-        raise
+    for candidate in (text, re.search(r"\{.*\}", text, re.DOTALL) and re.search(r"\{.*\}", text, re.DOTALL).group()):
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            try:
+                return json.loads(_repair_json(candidate))
+            except json.JSONDecodeError:
+                continue
+    raise json.JSONDecodeError("parse failed", text, 0)
 
 
 def _status_bar(
@@ -392,7 +402,7 @@ def _run_single(
         try:
             raw = _chat_with_spinner(
                 messages, label=f"{name}、考え中……",
-                temperature=0.8, max_tokens=350, json_mode=True,
+                temperature=0.8, max_tokens=450, json_mode=True,
             )
             parsed = _parse_action(raw)
         except Exception as e:
