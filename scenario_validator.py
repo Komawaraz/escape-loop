@@ -43,6 +43,17 @@ def _check_structure(s: dict, r: ValidationResult) -> None:
     if "door_lock" not in locks:
         r.errors.append("locks に 'door_lock' が存在しない")
 
+    # 最終鍵がロック報酬経由でのみ入手可能か確認
+    final_key = locks.get("door_lock", {}).get("key_required")
+    if final_key and final_key in items:
+        reward_items = {lock.get("reward") for lock in locks.values()}
+        contained = {c for item in items.values() for c in item.get("contains", [])}
+        if final_key not in reward_items and final_key not in contained:
+            r.errors.append(
+                f"door_lock の key_required '{final_key}' が床に直接置かれている。"
+                "必ず数字錠の reward 経由で入手できる構造にせよ"
+            )
+
     all_item_ids = set(items.keys())
     all_lock_ids = set(locks.keys())
     trap_ids = {t.get("trap_id") for t in traps if t.get("trap_id")}
@@ -173,23 +184,36 @@ def _check_solvability(s: dict, r: ValidationResult) -> None:
 
         return results
 
+    MIN_STEPS = 4  # 最低限必要なアクション数（これ未満は簡単すぎ）
+
     found = False
-    while queue:
-        state = queue.popleft()
+    min_depth = 0
+    queue_with_depth: deque[tuple] = deque([(start, 0)])
+    visited_depth: dict = {start: 0}
+
+    while queue_with_depth:
+        state, depth = queue_with_depth.popleft()
         if "door_lock" in state[2]:
             found = True
+            min_depth = depth
             break
         for nxt in next_states(state):
-            if nxt not in visited:
+            if nxt not in visited_depth:
+                visited_depth[nxt] = depth + 1
                 visited.add(nxt)
-                queue.append(nxt)
+                queue_with_depth.append((nxt, depth + 1))
 
     if not found:
         r.errors.append(
             "解法なし: door_lock を開く手順が存在しない（死亡トラップを除いたBFS探索で到達不可）"
         )
+    elif min_depth < MIN_STEPS:
+        r.errors.append(
+            f"シナリオが簡単すぎる: 最短クリアが {min_depth} ステップ（最低 {MIN_STEPS} 必要）。"
+            "パズルの手順を増やせ"
+        )
     else:
-        r.warnings.append(f"解法あり（BFS探索状態数: {len(visited)}）")
+        r.warnings.append(f"解法あり（最短 {min_depth} ステップ / BFS状態数: {len(visited)}）")
 
 
 if __name__ == "__main__":
