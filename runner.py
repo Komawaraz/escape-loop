@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 _STATE_FILE = Path(os.environ.get("ESCAPE_STATE_FILE", "/tmp/escape_loop_state.json"))
@@ -26,6 +27,51 @@ from memory import MemoryStore, RunRecord
 from scenario_gen import generate as gen_scenario
 
 console = Console()
+
+
+class GameLogger:
+    def __init__(self, title: str, char_name: str) -> None:
+        logs_dir = Path(__file__).resolve().parent / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_title = re.sub(r'[\\/:*?"<>|]', "_", title)
+        self._path = logs_dir / f"{ts}_{safe_title}.log"
+        self._f = self._path.open("w", encoding="utf-8")
+        self._write(f"=== {title} ===")
+        self._write(f"キャラクター: {char_name}")
+        self._write(f"開始: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        self._write("")
+
+    def run_start(self, run_no: int, max_runs: int) -> None:
+        self._write(f"{'─' * 40}")
+        self._write(f"Run {run_no}/{max_runs} 開始")
+        self._write(f"{'─' * 40}")
+
+    def step(self, step: int, action_str: str, narration: str, result: str) -> None:
+        self._write(f"\n[Step {step}] {action_str}")
+        if narration:
+            self._write(f"  「{narration}」")
+        self._write(f"  → {result}")
+
+    def run_end(self, outcome: str, steps: int, diary: str) -> None:
+        label = {"cleared": "脱出成功", "died": "死亡", "timeout": "タイムアウト"}.get(outcome, outcome)
+        self._write(f"\n結果: {label}  ({steps}ターン)")
+        self._write(f"振り返り: {diary}")
+
+    def game_end(self, outcome: str) -> None:
+        self._write(f"\n{'=' * 40}")
+        self._write(f"ゲーム終了: {'GAME CLEARED' if outcome == 'cleared' else 'GAME OVER'}")
+        self._write(f"終了: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        self.close()
+        console.print(f"[dim]ログ保存: {self._path}[/dim]")
+
+    def close(self) -> None:
+        if not self._f.closed:
+            self._f.close()
+
+    def _write(self, line: str) -> None:
+        self._f.write(line + "\n")
+        self._f.flush()
 
 
 def _stop_map_viewer() -> None:
@@ -260,6 +306,7 @@ def _run_single(
     memory: MemoryStore,
     step_delay: float = 4.0,
     char: dict | None = None,
+    logger: "GameLogger | None" = None,
 ) -> tuple[str, int, str]:
     """Returns (outcome, steps, last_narration)."""
     char = char or {}
@@ -336,13 +383,14 @@ def _run_single(
         last_result = result.message
         current_pos = args[0] if args else current_pos
         _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos)
+        if logger:
+            logger.step(step, action_str, narration, result.message)
         time.sleep(step_delay)
 
         if result.died:
             _you_died(result.death_reason)
             if result.death_memory_hint:
                 memory.add_danger(result.death_memory_hint)
-            # 具体的なアクションも記録して次Runで避けられるようにする
             memory.add_danger(f"【即死確認】{action_str} は実行禁止")
             return "died", step, last_narration
 
@@ -380,15 +428,18 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict
     time.sleep(2.0)
 
     memory = MemoryStore()
+    logger = GameLogger(title, name)
 
     for run_no in range(1, max_runs + 1):
+        logger.run_start(run_no, max_runs)
         outcome, steps, last_narration = _run_single(
-            scenario, run_no, max_runs, max_steps, memory, step_delay, char
+            scenario, run_no, max_runs, max_steps, memory, step_delay, char, logger
         )
 
         with console.status("[dim]振り返り中……[/dim]", spinner="dots2"):
             diary = _generate_diary(title, run_no, steps, outcome, last_narration, char)
         memory.add_run(RunRecord(run_no=run_no, steps=steps, outcome=outcome, diary=diary))
+        logger.run_end(outcome, steps, diary)
 
         if outcome == "cleared":
             console.print()
@@ -397,6 +448,7 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict
                 f"[bold bright_yellow]  GAME CLEARED  Total Runs: {run_no}[/bold bright_yellow]"
             )
             console.print(Rule(style="bright_yellow"))
+            logger.game_end("cleared")
             return
 
         if run_no < max_runs:
@@ -408,6 +460,7 @@ def run(scenario: dict, max_steps: int = 30, step_delay: float = 4.0, char: dict
     console.print(Rule(style="red"))
     console.print(f"[red]  {max_runs}回の挑戦、すべて失敗……  GAME OVER[/red]")
     console.print(Rule(style="red"))
+    logger.game_end("over")
 
 
 # ── エントリポイント ───────────────────────────────────────────
