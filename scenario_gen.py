@@ -82,6 +82,43 @@ _THEMES = [
 ]
 
 
+def _assign_map_positions(scenario: dict) -> None:
+    items = scenario.get("items", {})
+
+    # マップに出さないアイテム（他のアイテムに内包・報酬専用）
+    contained = {c for item in items.values() for c in item.get("contains", [])}
+    reward_only = {iid for iid, item in items.items() if item.get("reward_only")}
+    skip = contained | reward_only
+
+    # すでにmap_posが設定されていれば何もしない
+    to_place = [iid for iid in items if iid not in skip and "map_pos" not in items[iid]]
+    if not to_place:
+        return
+
+    # 出口扉（door_lockを持つアイテム）は右下 [4,4] に固定
+    exit_iid = next(
+        (iid for iid in to_place if items[iid].get("lock_id") == "door_lock"),
+        None,
+    )
+
+    used: set[tuple[int, int]] = set()
+    if exit_iid:
+        items[exit_iid]["map_pos"] = [4, 4]
+        used.add((4, 4))
+
+    # 残りを5x5グリッドにランダム配置（中央寄りに散らす）
+    candidates = [(x, y) for y in range(5) for x in range(5) if (x, y) not in used]
+    random.shuffle(candidates)
+
+    for iid in to_place:
+        if iid == exit_iid:
+            continue
+        if not candidates:
+            break
+        pos = candidates.pop(0)
+        items[iid]["map_pos"] = list(pos)
+
+
 def generate(theme: str | None = None, difficulty: str | None = None, max_retries: int = 3) -> dict:
     from scenario_validator import validate
 
@@ -116,6 +153,9 @@ def generate(theme: str | None = None, difficulty: str | None = None, max_retrie
             reward = lock.get("reward")
             if reward and reward in scenario.get("items", {}):
                 scenario["items"][reward]["reward_only"] = True
+
+        # マップ位置を5x5グリッドに自動配置
+        _assign_map_positions(scenario)
 
         result = validate(scenario)
         if result.ok:
