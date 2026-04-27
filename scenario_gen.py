@@ -157,8 +157,9 @@ def _repair_examine_death_traps(scenario: dict) -> None:
         if trigger.get("action") != "examine" or trap.get("severity") != "death":
             continue
         trap["severity"] = "warning"
-        if "warning_message" not in trap and "death_message" in trap:
-            trap["warning_message"] = trap["death_message"]
+        if "warning_message" not in trap:
+            hint = trap.get("memory_hint", "")
+            trap["warning_message"] = hint if hint else "強烈な危険を感じた……これ以上は命が危ない。"
         item_args = trigger.get("args", [])
         if item_args and item_args[0] not in required:
             new_traps.append({
