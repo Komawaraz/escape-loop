@@ -1,0 +1,89 @@
+{
+  "schema_version": "2.0",
+  "title": "呪われた図書館",
+  "intro": "気づくと見知らぬ図書館に立っていた。燃え残った本の匂い、倒れた燭台、血の染みた床。ここには何かがいる……。",
+  "max_runs": 5,
+  "items": {
+    "entrance_shelf": {
+      "name": "入口の本棚",
+      "examine": "燃えた本が積み重なっている。一冊だけ焼け残った革表紙の本がある。",
+      "contains": ["burned_book"]
+    },
+    "pedestal": {
+      "name": "石の台座",
+      "examine": "部屋の中央に鎮座する石の台座。表面に深く刻まれた数字が見える——『1 4 7』。これだけでは意味が分からない。"
+    },
+    "mirror": {
+      "name": "大きな鏡",
+      "examine": "TRAP: 鏡を覗き込んだ瞬間、暗闇の手がわたしを引き込んだ。鏡の中から何かがわたしを見ていた……意識が途絶えた。"
+    },
+    "iron_door": {
+      "name": "鉄の扉",
+      "examine": "重い鉄の扉。3桁の番号式錠前が埋め込まれている。番号を入力すれば開くだろう。",
+      "lock_id": "iron_lock"
+    },
+    "cursed_book": {
+      "name": "髑髏の表紙の本",
+      "examine": "棚の端に置かれた本。表紙に髑髏が刻まれ、ページが黒く変色している。何か良くないものを感じる。"
+    },
+    "candle_stand": {
+      "name": "燭台",
+      "examine": "まだ火がついている古い燭台。蠟が流れた先をよく見ると……うっすらと文字が見える。『鏡を見るな——鏡文字で読め』。"
+    },
+    "exit_door": {
+      "name": "出口の扉",
+      "examine": "重厚な木製の扉。古びた鍵穴がひとつある。鍵さえあれば開けられそうだ。",
+      "lock_id": "door_lock"
+    },
+    "burned_book": {
+      "name": "焼け残った革表紙の本",
+      "examine": "中を開くと、震える筆跡で書かれている。『鏡は死をもたらす。文字だけを読め。石の数字を鏡で見よ』。",
+      "takeable": true
+    },
+    "crystal_key": {
+      "name": "水晶の鍵",
+      "examine": "透き通った水晶でできた鍵。持ち手に小さく「EXIT」と刻まれている。",
+      "takeable": true
+    }
+  },
+  "locks": {
+    "iron_lock": {
+      "digits": 3,
+      "answer": "741",
+      "hint": "石の台座の数字を鏡文字で読め（逆から読む）",
+      "reward": "crystal_key"
+    },
+    "door_lock": {
+      "key_required": "crystal_key"
+    }
+  },
+  "traps": [
+    {
+      "trap_id": "mirror_trap",
+      "trigger": {"action": "examine", "args": ["mirror"]},
+      "severity": "death",
+      "death_message": "鏡を覗き込んだ瞬間、暗闇の手がわたしを引き込んだ。鏡の中から何かがわたしを見ていた……意識が途絶えた。",
+      "memory_hint": "大きな鏡（mirror）を直接調べると死ぬ。燭台か本から情報を得ること"
+    },
+    {
+      "trap_id": "cursed_book_pickup_trap",
+      "trigger": {"action": "pick_up", "args": ["cursed_book"]},
+      "severity": "death",
+      "death_message": "本に触れた瞬間、黒い霧がわたしを包んだ。骨まで凍りつくような痛みとともに、意識が消えた。",
+      "memory_hint": "髑髏表紙の本（cursed_book）は触れると死ぬ。調べるだけにとどめること"
+    },
+    {
+      "trap_id": "iron_lock_exhaust_trap",
+      "trigger": {},
+      "severity": "death",
+      "death_message": "何度も入力を誤った……警報音が鳴り響き、部屋が封鎖された。床が開き、わたしは暗闇へ落下した。",
+      "memory_hint": "鉄の扉の番号錠（iron_lock）は3回しか試せない。必ず石の台座の数字を逆順（741）にして入力すること"
+    }
+  ],
+  "code_limits": {
+    "iron_lock": {
+      "max_attempts": 3,
+      "exhaust_trap": "iron_lock_exhaust_trap"
+    }
+  }
+}

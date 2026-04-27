@@ -1,0 +1,60 @@
+{
+  "title": "古びた図書館からの脱出",
+  "intro": "目が覚めると見知らぬ図書館にいた。薄暗い部屋に本棚が並び、出口のドアには鍵がかかっている。どうやって脱出するのか……。",
+  "items": {
+    "bookshelf_a": {
+      "name": "本棚A",
+      "examine": "古い本が所狭しと並んでいる。一冊だけ、赤い背表紙の本が目立つ。",
+      "contains": ["red_book"]
+    },
+    "bookshelf_b": {
+      "name": "本棚B",
+      "examine": "ほこりを被った辞書が並んでいる。棚の隅に、折りたたまれたメモが挟まっている。",
+      "contains": ["note"]
+    },
+    "clock": {
+      "name": "柱時計",
+      "examine": "大きな振り子時計だが、止まっている。針は3時14分を指したまま動かない。"
+    },
+    "desk": {
+      "name": "古い机",
+      "examine": "天板に何かを書いた跡がある。『答えは部屋が教えてくれる』。引き出しは開いている——中は空だ。"
+    },
+    "locked_box": {
+      "name": "南京錠のついた箱",
+      "examine": "木製の小箱に3桁の番号錠がついている。正しい番号を入力すれば開くだろう。",
+      "lock_id": "box_lock"
+    },
+    "exit_door": {
+      "name": "出口のドア",
+      "examine": "重厚な木製のドア。鍵穴がひとつある。鍵さえあれば開けられそうだ。",
+      "lock_id": "door_lock"
+    },
+    "red_book": {
+      "name": "赤い本",
+      "examine": "表紙に大きくローマ数字で「III」と刻まれている。中身は白紙だ。",
+      "takeable": true
+    },
+    "note": {
+      "name": "折りたたまれたメモ",
+      "examine": "走り書きで一言だけ書かれている。『時計は止まった瞬間を教えてくれる』。",
+      "takeable": true
+    },
+    "gold_key": {
+      "name": "金の鍵",
+      "examine": "重みのある金色の鍵。持ち手に小さく「EXIT」と刻まれている。",
+      "takeable": true
+    }
+  },
+  "locks": {
+    "box_lock": {
+      "digits": 3,
+      "answer": "314",
+      "reward": "gold_key",
+      "hint": "時計が止まった時刻を数字で読め"
+    },
+    "door_lock": {
+      "key_required": "gold_key"
+    }
+  }
+}
