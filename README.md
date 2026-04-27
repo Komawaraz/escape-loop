@@ -65,6 +65,63 @@ python runner.py --step-delay 7
 python runner.py --max-steps 20
 ```
 
+## コンパニオンマップビューア
+
+`map_viewer.py` はゲームとは独立したCLIで、リアルタイムに部屋の見取り図を表示します。
+`runner.py` が書き出す状態ファイル（`/tmp/escape_loop_state.json`）を0.5秒ごとに監視して自動更新します。
+
+### tmux使用（推奨）
+
+tmux を使うと `runner.py` 起動時にマップビューアが**自動で右ペインに開きます**。
+
+```bash
+# tmuxセッションを開始
+tmux new-session -s escape
+
+# venvを有効化してゲームを起動するだけ — map_viewer.py は自動起動
+cd escape-loop
+source .venv/bin/activate
+python runner.py --scenario scenarios/cursed_library.json
+```
+
+`Ctrl+C` でゲームを終了すると、マップビューアも自動で停止します。
+
+> **注意**: 前回の `map_viewer.py` が残っている場合は起動がスキップされます。
+> `pkill -f map_viewer.py` で停止してから再起動してください。
+
+### tmux未使用（手動起動）
+
+ターミナルを2枚開いて別々に起動します。
+
+```bash
+# ターミナル1: ゲーム本体
+source .venv/bin/activate
+python runner.py --scenario scenarios/cursed_library.json
+
+# ターミナル2: マップビューア（runner.py の起動前後どちらでも可）
+source .venv/bin/activate
+python map_viewer.py
+```
+
+ゲームを `Ctrl+C` で終了してもマップビューアは停止しません。手動で `Ctrl+C` してください。
+
+### マップの見方
+
+```
+★[入口の本棚        ]     [                 ]   [大きな鏡*        ]
+ [鉄の扉*           ]     [石の台座         ]   [燭台             ]
+ [                  ]     [                 ]   [出口の扉*        ]
+```
+
+| 表示 | 意味 |
+|---|---|
+| `★[アイテム名]` | AIの現在地（シアン太字） |
+| `★[アイテム名*]` | 現在地かつ鍵がかかっている（黄太字） |
+| ` [アイテム名]` | 発見済みアイテム |
+| ` [アイテム名*]` | 発見済みだが鍵がかかっている（黄色） |
+| `(持参済)` | インベントリに入っている |
+| 空欄 | 未発見（`look_around` で探索すると出現） |
+
 ## 対応LLMバックエンド
 
 `.env` に以下を設定してください。
@@ -85,6 +142,8 @@ python runner.py --max-steps 20
 | `scenario_gen.py` | LLMでシナリオJSONを生成。BFS検証をパスするまで最大3回リトライ |
 | `scenario_validator.py` | 構造チェック + BFSで「本当に解けるか」を確認 |
 | `runner.py` | メインループ。LLMにアクションを問い合わせ、タイプライター表示で結果を出力 |
+| `map_renderer.py` | ゲーム内マップ描画ライブラリ |
+| `map_viewer.py` | コンパニオンCLI。状態ファイルを監視してリアルタイムにマップを表示 |
 
 ## キャラクターの設定
 
