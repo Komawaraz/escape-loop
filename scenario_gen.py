@@ -134,6 +134,43 @@ def _assign_map_positions(scenario: dict) -> None:
         items[iid]["map_pos"] = list(pos)
 
 
+def _repair_examine_death_traps(scenario: dict) -> None:
+    """examine の death トラップを warning に降格し、pick_up の death トラップに移植する。
+    「調べるとヒント＋警告、拾うと死ぬ」構造にすることで脅威を維持しつつ詰み防止。
+    ただし解法に必須なアイテム（鍵・報酬・内包）への移植は行わない。"""
+    locks = scenario.get("locks", {})
+    items = scenario.get("items", {})
+
+    required: set[str] = set()
+    for lock in locks.values():
+        for field in ("key_required", "reward"):
+            iid = lock.get(field)
+            if iid:
+                required.add(iid)
+    for item in items.values():
+        for c in item.get("contains", []):
+            required.add(c)
+
+    new_traps: list[dict] = []
+    for trap in scenario.get("traps", []):
+        trigger = trap.get("trigger", {})
+        if trigger.get("action") != "examine" or trap.get("severity") != "death":
+            continue
+        trap["severity"] = "warning"
+        if "warning_message" not in trap and "death_message" in trap:
+            trap["warning_message"] = trap["death_message"]
+        item_args = trigger.get("args", [])
+        if item_args and item_args[0] not in required:
+            new_traps.append({
+                "trap_id": f"{trap.get('trap_id', 'trap')}_pickup",
+                "trigger": {"action": "pick_up", "args": item_args},
+                "severity": "death",
+                "death_message": trap.get("death_message", "罠が発動した……"),
+                "memory_hint": trap.get("memory_hint", ""),
+            })
+    scenario.setdefault("traps", []).extend(new_traps)
+
+
 def _auto_repair_missing_items(scenario: dict) -> None:
     """LLMが items に定義し忘れた reward / key_required アイテムを最小構成で補完する。"""
     items: dict = scenario.setdefault("items", {})
@@ -181,6 +218,9 @@ def generate(theme: str | None = None, difficulty: str | None = None, max_retrie
 
         # LLMが items に追加し忘れた lock reward / key_required を補完する
         _auto_repair_missing_items(scenario)
+
+        # examine の death トラップを warning に降格する（ヒント取得不能防止）
+        _repair_examine_death_traps(scenario)
 
         # ロック報酬アイテムは初期非表示にする
         for lock in scenario.get("locks", {}).values():
