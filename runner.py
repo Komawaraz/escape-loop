@@ -311,7 +311,11 @@ def _build_user_msg(
         f'{{"narration": "{name}の独り言（1〜2文）", "action": "アクション名", "args": ["引数1", ...]}}\n\n'
         f"アクション: look_around / examine / pick_up / use_item / enter_code\n"
         f"アイテムID（[]内がargs に使うID）: {', '.join(item_ids)}\n"
-        f"錠前ID: {', '.join(_lock_label(lid, locks) for lid in lock_ids)}"
+        f"錠前ID: {', '.join(_lock_label(lid, locks) for lid in lock_ids)}\n\n"
+        "【行動ルール】\n"
+        "- look_around: 現在の状況と同じ情報しか返さない。既に全アイテムが見えているなら使うな。\n"
+        "- use_item(A, B): AがBの錠前の key_required である場合のみ機能する。鍵と錠の対応がなければ何も起きない。闇雲な組み合わせ試行は禁止。\n"
+        "- enter_code: 数字錠IDと推測したコードを指定する。examine で集めたヒントから数字を論理的に導いて入力せよ。"
     )
 
 
