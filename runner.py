@@ -275,7 +275,9 @@ def _lock_label(lid: str, locks: dict | None) -> str:
     lock = locks.get(lid, {})
     if "answer" in lock:
         digits = lock.get("digits", len(str(lock["answer"])))
-        return f"{lid}（{digits}桁の数字錠）"
+        return f"{lid}（{digits}桁の数字錠→enter_code）"
+    if "key_required" in lock:
+        return f"{lid}（物理鍵錠→use_item）"
     return lid
 
 
