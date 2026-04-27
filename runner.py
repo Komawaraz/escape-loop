@@ -477,6 +477,7 @@ if __name__ == "__main__":
     char_data = _load_character(args.character)
     char_name = char_data.get("name", "runner")
 
+    ai_generated = False
     if args.scenario:
         with open(args.scenario, encoding="utf-8") as f:
             scenario_data = json.load(f)
@@ -489,6 +490,24 @@ if __name__ == "__main__":
         with console.status(f"[dim cyan]{char_name}、舞台を組み立て中……[/dim cyan]", spinner="dots2"):
             scenario_data = gen_scenario(theme=args.theme)
         console.print(f"[cyan]生成完了: {scenario_data.get('title')}[/cyan]")
+        ai_generated = True
         time.sleep(1.5)
 
     run(scenario_data, max_steps=args.max_steps, step_delay=args.step_delay, char=char_data)
+
+    if ai_generated:
+        console.print()
+        try:
+            answer = input("このシナリオを保存しますか？ [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = ""
+        if answer == "y":
+            scenarios_dir = Path(__file__).resolve().parent / "scenarios"
+            scenarios_dir.mkdir(exist_ok=True)
+            safe_title = re.sub(r'[\\/:*?"<>|]', "_", scenario_data.get("title", "scenario"))
+            save_path = scenarios_dir / f"{safe_title}.json"
+            save_path.write_text(
+                json.dumps(scenario_data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            console.print(f"[cyan]保存しました: {save_path}[/cyan]")
