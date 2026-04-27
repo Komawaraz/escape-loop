@@ -132,7 +132,10 @@ def _check_solvability(s: dict, r: ValidationResult) -> None:
                 death_triggers.add((action, args[0]))
 
     contained = {c for item in items.values() for c in item.get("contains", [])}
-    init_visible = frozenset(iid for iid in items if iid not in contained)
+    reward_only = {iid for iid, item in items.items() if item.get("reward_only")}
+    init_visible = frozenset(
+        iid for iid in items if iid not in contained and iid not in reward_only
+    )
 
     State = tuple[frozenset, frozenset, frozenset]
     start: State = (init_visible, frozenset(), frozenset())
