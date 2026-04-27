@@ -235,6 +235,7 @@ def _write_state(
     last_narration: str,
     won: bool = False,
     current_pos: str = "",
+    memo: list | None = None,
 ) -> None:
     state = {
         "title": scenario.get("title", ""),
@@ -249,6 +250,7 @@ def _write_state(
         "last_narration": last_narration,
         "won": won,
         "current_pos": current_pos,
+        "memo": memo or [],
         "scenario": scenario,
     }
     try:
@@ -312,6 +314,7 @@ def _run_single(
     step_delay: float = 4.0,
     char: dict | None = None,
     logger: "GameLogger | None" = None,
+    room_memo: list[str] | None = None,
 ) -> tuple[str, int, str]:
     """Returns (outcome, steps, last_narration)."""
     char = char or {}
@@ -387,7 +390,10 @@ def _run_single(
         _typewrite(result.message, style="yellow", delay=0.03)
         last_result = result.message
         current_pos = args[0] if args else current_pos
-        _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos)
+        if room_memo is not None:
+            short = result.message[:24] + "…" if len(result.message) > 24 else result.message
+            room_memo.append(f"[R{run_no}-S{step}] {action_str}: {short}")
+        _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos, memo=room_memo)
         if logger:
             logger.step(step, action_str, narration, result.message)
         time.sleep(step_delay)
@@ -400,7 +406,7 @@ def _run_single(
             return "died", step, last_narration
 
         if result.cleared:
-            _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, won=True, current_pos=current_pos)
+            _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, won=True, current_pos=current_pos, memo=room_memo)
             console.print()
             console.print(Rule(style="yellow"))
             console.print(
@@ -444,10 +450,12 @@ def _run_room(
     console.print()
     time.sleep(2.0)
 
+    room_memo: list[str] = []
     for run_no in range(1, max_runs + 1):
         logger.run_start(run_no, max_runs)
         outcome, steps, last_narration = _run_single(
-            scenario, run_no, max_runs, max_steps, memory, step_delay, char, logger
+            scenario, run_no, max_runs, max_steps, memory, step_delay, char, logger,
+            room_memo=room_memo,
         )
 
         with console.status("[dim]振り返り中……[/dim]", spinner="dots2"):

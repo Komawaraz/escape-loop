@@ -148,8 +148,15 @@ def build_display(state: dict) -> Text:
     if last_narration:
         out.append(f" 「{last_narration}」\n", style="italic white")
 
+    memo: list = state.get("memo", [])
+    if memo:
+        out.append("─" * 40 + "\n", style="dim")
+        out.append(" 部屋メモ\n", style="bold dim")
+        for entry in memo[-20:]:
+            out.append(f"  {entry}\n", style="dim")
+
     if won:
-        out.append("\n 🎉 脱出成功！\n", style="bold yellow")
+        out.append("\n ★ 脱出成功！\n", style="bold yellow")
 
     return out
 
