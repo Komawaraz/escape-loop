@@ -303,6 +303,29 @@ def _generate_diary(
         return f"Run{run_no}: {outcome}"
 
 
+_ACTION_JP = {
+    "look_around": "見回す",
+    "examine": "調べる",
+    "pick_up": "拾う",
+    "use_item": "使う",
+    "enter_code": "コード入力",
+}
+
+
+def _memo_entry(run_no: int, step: int, action: str, args: list[str], game: "EscapeEngine") -> str:
+    label = _ACTION_JP.get(action, action)
+    if action == "look_around":
+        return f"R{run_no}S{step} {label}"
+    if action in ("examine", "pick_up") and args:
+        return f"R{run_no}S{step} {label}({game.name(args[0])})"
+    if action == "use_item" and len(args) >= 2:
+        return f"R{run_no}S{step} {label}({game.name(args[0])}→{game.name(args[1])})"
+    if action == "enter_code" and args:
+        code = args[1] if len(args) > 1 else "?"
+        return f"R{run_no}S{step} {label}({args[0]}, {code})"
+    return f"R{run_no}S{step} {label}({', '.join(args)})"
+
+
 # ── シングルラン ───────────────────────────────────────────────
 
 def _run_single(
@@ -391,7 +414,7 @@ def _run_single(
         last_result = result.message
         current_pos = args[0] if args else current_pos
         if room_memo is not None:
-            room_memo.append(f"R{run_no}S{step} {action_str}")
+            room_memo.append(_memo_entry(run_no, step, action, args, game))
         _write_state(scenario, game, run_no, max_runs, step, max_steps, action_str, narration, current_pos=current_pos, memo=room_memo)
         if logger:
             logger.step(step, action_str, narration, result.message)
